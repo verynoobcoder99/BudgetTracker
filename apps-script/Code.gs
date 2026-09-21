@@ -239,20 +239,34 @@ function getSummary(month) {
 // ---------- Helpers ----------
 
 function formatDateValue(value) {
+  // First, check if it's a native Date object
   if (value instanceof Date) {
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, '0');
-    const d = String(value.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return _format(value);
   }
-  // If it's already a string, try to normalize it
+  
+  // If it's a string, try parsing it
   if (typeof value === 'string') {
-    // Handle MM/DD/YYYY format
+    // Check for MM/DD/YYYY
     const parts = value.split('/');
     if (parts.length === 3) {
       return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
     }
+    
+    // Try passing it to new Date() (handles "Mon Sep 21 2026 00:00:00 GMT-0400")
+    const d = new Date(value);
+    if (!isNaN(d.getTime())) {
+      return _format(d);
+    }
+    
     return value;
   }
+  
   return String(value);
+}
+
+function _format(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
