@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budget Tracker — Couples Spending Dashboard</title>
+  <meta name="description" content="Interactive budget tracker for couples. Track daily spending, view monthly summaries, and manage budgets together." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <link rel="stylesheet" href="/index.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <nav id="sidebar" class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <i data-lucide="wallet" class="brand-lucide"></i>
+        </div>
+        <span class="brand-text">BudgetDuo</span>
+      </div>
+
+      <ul class="nav-links">
+        <li>
+          <a href="#dashboard" class="nav-link active" data-page="dashboard">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="#add-expense" class="nav-link" data-page="add-expense">
+            <i data-lucide="plus-circle"></i>
+            <span>Add Expense</span>
+          </a>
+        </li>
+        <li>
+          <a href="#transactions" class="nav-link" data-page="transactions">
+            <i data-lucide="list"></i>
+            <span>Transactions</span>
+          </a>
+        </li>
+        <li>
+          <a href="#settings" class="nav-link" data-page="settings">
+            <i data-lucide="settings"></i>
+            <span>Settings</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="sync-status" id="sync-status">
+          <i data-lucide="cloud" class="sync-icon"></i>
+          <span class="sync-text">Connected</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+      <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Toggle menu">
+        <i data-lucide="menu"></i>
+      </button>
+      <span class="brand-text">BudgetDuo</span>
+      <div class="mobile-sync" id="mobile-sync-status">
+        <i data-lucide="cloud" class="sync-icon"></i>
+      </div>
+    </header>
+
+    <!-- Overlay for mobile sidebar -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+    <!-- Main Content -->
+    <main id="main-content" class="main-content">
+      <!-- Page content rendered here by router -->
+    </main>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
