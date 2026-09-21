@@ -86,7 +86,8 @@ export async function fetchTransactions(month) {
   }
 
   try {
-    const url = `${settings.apiUrl}?action=getTransactions&month=${month}`;
+    // Add timestamp to prevent aggressive browser caching
+    const url = `${settings.apiUrl}?action=getTransactions&month=${month}&t=${Date.now()}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
