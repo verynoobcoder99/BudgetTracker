@@ -198,6 +198,44 @@ export async function deleteTransaction(rowIndex, month) {
   }
 }
 
+export async function editTransaction({ row, date, person, category, description, amount }) {
+  const settings = loadSettings();
+
+  if (!settings.apiUrl) {
+    // Mock mode — find and update in cache
+    for (const key of Object.keys(mockCache)) {
+      const txns = mockCache[key];
+      const idx = txns.findIndex(t => t.row === row);
+      if (idx !== -1) {
+        txns[idx] = { ...txns[idx], date, person, category, description, amount: parseFloat(amount) };
+        break;
+      }
+    }
+    return { success: true };
+  }
+
+  try {
+    const res = await fetch(settings.apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'editTransaction',
+        row,
+        date,
+        person,
+        category,
+        description,
+        amount: parseFloat(amount),
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to edit transaction:', err);
+    throw err;
+  }
+}
+
 // ---------- Summary Computation (client-side from transactions) ----------
 
 export function computeSummary(transactions, settings) {

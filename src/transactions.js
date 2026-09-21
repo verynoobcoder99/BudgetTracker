@@ -2,7 +2,7 @@
 // TRANSACTIONS — Full transaction log with filters
 // ========================================================================
 
-import { fetchTransactions, deleteTransaction, computeSummary } from './api.js';
+import { fetchTransactions, deleteTransaction, editTransaction, computeSummary } from './api.js';
 import {
   $, $$, createElement, formatCurrency, formatDate, formatMonthYear,
   getCurrentMonth, getPreviousMonth, getNextMonth,
@@ -61,7 +61,7 @@ export function renderTransactions(container) {
             <th>Category</th>
             <th>Description</th>
             <th style="text-align:right;">Amount</th>
-            <th style="width:60px;"></th>
+            <th style="width:90px;"></th>
           </tr>
         </thead>
         <tbody id="transactions-body">
@@ -70,6 +70,61 @@ export function renderTransactions(container) {
       <div class="table-footer" id="table-footer">
         <span id="tx-count">0 transactions</span>
         <span class="table-total" id="tx-total">Total: $0.00</span>
+      </div>
+    </div>
+
+    <!-- Edit Modal Overlay -->
+    <div class="edit-modal-overlay" id="edit-modal-overlay" style="display:none;">
+      <div class="edit-modal">
+        <div class="edit-modal-header">
+          <h3>Edit Transaction</h3>
+          <button class="edit-modal-close" id="edit-modal-close" title="Close">✕</button>
+        </div>
+        <form id="edit-form" autocomplete="off">
+          <input type="hidden" id="edit-row" />
+
+          <div class="form-group">
+            <label class="form-label" for="edit-amount">Amount</label>
+            <div class="amount-wrapper">
+              <span class="currency-symbol">$</span>
+              <input type="number" id="edit-amount" class="form-input" step="0.01" min="0.01" required inputmode="decimal" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Who spent it?</label>
+            <div class="person-toggle" id="edit-person-toggle">
+              <button type="button" class="person-btn person-1" data-person="${settings.person1Name}">
+                ${settings.person1Name}
+              </button>
+              <button type="button" class="person-btn person-2" data-person="${settings.person2Name}">
+                ${settings.person2Name}
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-category">Category</label>
+            <select id="edit-category" class="form-select" required>
+              ${CATEGORIES.map(c => `<option value="${c.label}">${c.icon} ${c.label}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-description">Description</label>
+            <input type="text" id="edit-description" class="form-input" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-date">Date</label>
+            <input type="date" id="edit-date" class="form-input" required />
+          </div>
+
+          <div class="edit-modal-actions">
+            <button type="button" class="btn-secondary" id="edit-cancel">Cancel</button>
+            <button type="submit" class="btn-primary" id="edit-save">Save Changes</button>
+          </div>
+        </form>
       </div>
     </div>
   `;
@@ -88,6 +143,9 @@ export function renderTransactions(container) {
   $('#filter-person', container).addEventListener('change', () => applyFilters(container));
   $('#filter-category', container).addEventListener('change', () => applyFilters(container));
   $('#export-csv', container).addEventListener('click', () => exportCSV(container));
+
+  // Edit modal events
+  wireEditModal(container);
 
   loadTransactions(container);
 }
@@ -163,8 +221,9 @@ function renderTable(container, transactions, settings) {
   let total = 0;
   tbody.innerHTML = '';
 
-  // Inline SVG for trash icon (avoids Lucide replacing elements after event binding)
+  // Inline SVGs for icons (avoids Lucide replacing elements after event binding)
   const trashSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
+  const editSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>`;
 
   for (const tx of sorted) {
     const cat = getCategoryByLabel(tx.category);
@@ -189,9 +248,14 @@ function renderTable(container, transactions, settings) {
       <td>${tx.description}</td>
       <td style="text-align:right; font-weight:600;">${formatCurrency(amount)}</td>
       <td>
-        <button class="btn-danger delete-tx" data-row="${tx.row}" title="Delete">
-          ${trashSvg}
-        </button>
+        <div class="tx-actions">
+          <button class="btn-icon edit-tx" data-row="${tx.row}" data-date="${tx.date}" data-person="${tx.person}" data-category="${tx.category}" data-description="${tx.description}" data-amount="${amount}" title="Edit">
+            ${editSvg}
+          </button>
+          <button class="btn-danger delete-tx" data-row="${tx.row}" title="Delete">
+            ${trashSvg}
+          </button>
+        </div>
       </td>
     `;
 
@@ -203,6 +267,16 @@ function renderTable(container, transactions, settings) {
   let pendingDeleteTimeout = null;
 
   tbody.onclick = async (e) => {
+    // Handle edit button click
+    const editBtn = e.target.closest('.edit-tx');
+    if (editBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      openEditModal(container, editBtn.dataset);
+      return;
+    }
+
+    // Handle delete button click
     const btn = e.target.closest('.delete-tx');
     if (!btn) return;
 
@@ -259,6 +333,111 @@ function renderTable(container, transactions, settings) {
 
   txCount.textContent = `${sorted.length} transaction${sorted.length !== 1 ? 's' : ''}`;
   txTotal.textContent = `Total: ${formatCurrency(total)}`;
+}
+
+// ---------- Edit Modal Logic ----------
+
+let editSelectedPerson = '';
+
+function openEditModal(container, data) {
+  const overlay = $('#edit-modal-overlay', container);
+  if (!overlay) return;
+
+  const settings = loadSettings();
+
+  // Populate fields
+  $('#edit-row', container).value = data.row;
+  $('#edit-amount', container).value = data.amount;
+  $('#edit-category', container).value = data.category;
+  $('#edit-description', container).value = data.description;
+  $('#edit-date', container).value = data.date;
+
+  // Set person toggle
+  editSelectedPerson = data.person;
+  const personBtns = $$('.person-btn', $('#edit-person-toggle', container));
+  personBtns.forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.person === data.person ||
+        (data.person === 'Person 1' && btn.dataset.person === settings.person1Name) ||
+        (data.person === 'Person 2' && btn.dataset.person === settings.person2Name)) {
+      btn.classList.add('active');
+      editSelectedPerson = btn.dataset.person;
+    }
+  });
+
+  overlay.style.display = 'flex';
+  // Animate in
+  requestAnimationFrame(() => overlay.classList.add('active'));
+  setTimeout(() => $('#edit-amount', container).focus(), 150);
+}
+
+function closeEditModal(container) {
+  const overlay = $('#edit-modal-overlay', container);
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => { overlay.style.display = 'none'; }, 200);
+}
+
+function wireEditModal(container) {
+  const settings = loadSettings();
+
+  // Close modal
+  $('#edit-modal-close', container).addEventListener('click', () => closeEditModal(container));
+  $('#edit-cancel', container).addEventListener('click', () => closeEditModal(container));
+
+  // Close on overlay click
+  $('#edit-modal-overlay', container).addEventListener('click', (e) => {
+    if (e.target.id === 'edit-modal-overlay') closeEditModal(container);
+  });
+
+  // Person toggle in edit modal
+  const editPersonToggle = $('#edit-person-toggle', container);
+  editPersonToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('.person-btn');
+    if (!btn) return;
+    editPersonToggle.querySelectorAll('.person-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    editSelectedPerson = btn.dataset.person;
+  });
+
+  // Save edits
+  $('#edit-form', container).addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const row = parseInt($('#edit-row', container).value);
+    const amount = parseFloat($('#edit-amount', container).value);
+    const category = $('#edit-category', container).value;
+    const description = $('#edit-description', container).value.trim();
+    const date = $('#edit-date', container).value;
+
+    if (!amount || !category || !description || !date) {
+      showToast('Please fill in all fields', 'error');
+      return;
+    }
+
+    const saveBtn = $('#edit-save', container);
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    try {
+      await editTransaction({
+        row,
+        date,
+        person: editSelectedPerson,
+        category,
+        description,
+        amount,
+      });
+      showToast('Transaction updated!', 'success');
+      closeEditModal(container);
+      await loadTransactions(container);
+    } catch (err) {
+      showToast('Failed to update transaction', 'error');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Changes';
+    }
+  });
 }
 
 function exportCSV(container) {

@@ -66,6 +66,9 @@ function doPost(e) {
       case 'addTransaction':
         result = addTransaction(body);
         break;
+      case 'editTransaction':
+        result = editTransaction(body);
+        break;
       case 'deleteTransaction':
         result = deleteTransaction(body.row);
         break;
@@ -148,6 +151,22 @@ function addTransaction(data) {
       amount: parseFloat(data.amount) || 0,
     },
   };
+}
+
+function editTransaction(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return { error: 'Sheet not found' };
+  const row = data.row;
+  if (row < 2 || row > sheet.getLastRow()) return { error: 'Invalid row number' };
+
+  sheet.getRange(row, 1).setValue(data.date);
+  sheet.getRange(row, 2).setValue(data.person);
+  sheet.getRange(row, 3).setValue(data.category);
+  sheet.getRange(row, 4).setValue(data.description);
+  sheet.getRange(row, 5).setValue(parseFloat(data.amount) || 0);
+  sheet.getRange(row, 5).setNumberFormat('$#,##0.00');
+
+  return { success: true, row: row };
 }
 
 function deleteTransaction(rowNumber) {
