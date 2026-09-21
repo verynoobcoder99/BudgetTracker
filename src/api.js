@@ -86,16 +86,47 @@ export async function fetchTransactions(month) {
   }
 
   try {
-    // Add timestamp to prevent aggressive browser caching
-    const url = `${settings.apiUrl}?action=getTransactions&month=${month}&t=${Date.now()}`;
+    // Fetch ALL transactions (don't rely on server-side month filtering,
+    // because Google Sheets returns dates in unpredictable formats)
+    const url = `${settings.apiUrl}?action=getTransactions&t=${Date.now()}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return data.transactions || [];
+    let transactions = data.transactions || [];
+
+    // Normalize dates on the client side
+    transactions = transactions.map(tx => ({
+      ...tx,
+      date: normalizeDate(tx.date),
+    }));
+
+    // Filter by month on the client side
+    if (month) {
+      transactions = transactions.filter(tx => tx.date.substring(0, 7) === month);
+    }
+
+    return transactions;
   } catch (err) {
     console.error('Failed to fetch transactions:', err);
     throw err;
   }
+}
+
+// Parse any date format into YYYY-MM-DD
+function normalizeDate(dateStr) {
+  if (!dateStr) return '';
+  // Already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  // Try parsing with Date constructor (handles long strings like
+  // "Mon Sep 21 2026 00:00:00 GMT-0400 (Eastern Daylight Time)")
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return dateStr;
 }
 
 export async function addTransaction({ date, person, category, description, amount }) {
